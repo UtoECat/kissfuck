@@ -13,9 +13,9 @@ OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
 DEPS := $(OBJS:.o=.d)
 INC_FLAGS := -I.
 #forming compiler flags
-UNIFLAGS ?= -Os -Wall -Wextra -flto -g
+UNIFLAGS ?= -O3 -Wall -Wextra -flto
 LINFLAGS ?= 
-CMPFLAGS ?= $(INC_FLAGS) -MMD -MP $(UNIFLAGS) -std=gnu11
+CMPFLAGS ?= $(INC_FLAGS) -MMD -MP $(UNIFLAGS) -std=gnu2x -fanalyzer
 
 #libraries, that we need to link
 LDLIBS := -lm

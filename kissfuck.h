@@ -12,6 +12,11 @@
  * GLOBAL FLAGS
  */
 
+#define unreachable() __builtin_unreachable()
+#define _fallthrough() __attribute__((fallthrough));
+#define likely(x)      __builtin_expect(!!(x), 1)
+#define unlikely(x)    __builtin_expect(!!(x), 0)
+
 #define DEBUG_FLAG 0
 #define EXTENSIONS_FLAG 1
 

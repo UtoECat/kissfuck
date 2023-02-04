@@ -1,8 +1,10 @@
 #include <kissfuck.h>
+#include <stddef.h>
 #include <stdlib.h>
+#include <assert.h>
 
 /*
- * KISS brainfuck iterpreter.
+ * KISS brainfuck iterpreter. Compiler to the bytecode.
  * Copyright (C) UtoECat 2023. All rights reserved.
  * GNU GPL License. No any warranty. 
  *
@@ -12,6 +14,7 @@
 /*
  * Context allocation
  */
+
 
 struct kissfuck* makectx() {
 	void *p = calloc(sizeof(struct kissfuck), 1);
@@ -30,44 +33,98 @@ void freectx (struct kissfuck* x) {
  * COMPILING
  */
 
-static void compiler_message(struct kissfuck* x, const char* s) {
+struct compstate {
+	uint8_t*      bytecode;
+	uint16_t      instp; // instruction pointer
+	uint16_t      jmptbl[65536][2];
+	uint16_t      jmptblpos;
+	enum bytecode currcode;
+	int           codedata;
+	int           line;
+};
+
+#define NEXT_CHAR() ch = getc(f);
+
+static void compiler_message(struct compstate* x, const char* s) {
 	fprintf(stderr, "[compiler] : %s (at line %i)\n", s, x->line);
 }
 
-#define INDEX_LONG_BC(x, pos) *((uint16_t*)(x->bytecode + (pos)))
-
-static int finallize_jumppair(struct kissfuck* x, uint16_t first, uint16_t second) {
-	// some assertions first
-	if (x->bytecode[first] != BC_JPZ) {
-		return ERR_ERR;
-	}
-	if (x->bytecode[second] != BC_JPNZ) {
-		return ERR_ERR;
-	}
-	uint16_t start = first  + sizeof(uint16_t) + 1;
-	uint16_t end   = second + sizeof(uint16_t) + 1;
-	// set jump destinations :D
-	INDEX_LONG_BC(x, first  + 1) = end;
-	INDEX_LONG_BC(x, second + 1) = start;
-	return ERR_OK;
-}
-
-static int checkchar(FILE* f, char ch) {
-	return (!feof(f)) && ch;
-}
-
-static inline void pushbc1(struct kissfuck* x, enum bytecode b, uint8_t v) {
+// sets instruction with short argument (8 bits)
+static inline void pushbc1(struct compstate* x, enum bytecode b, uint8_t v) {
 	x->bytecode[x->instp++] = b;
 	x->bytecode[x->instp++] = v; // constant value
 };
 
-static inline void pushbc2(struct kissfuck* x, enum bytecode b, uint16_t v) {
+// sets instruction with long argument (16 bits, 1 byte alligment)
+static inline void pushbc2(struct compstate* x, enum bytecode b, uint16_t v) {
 	x->bytecode[x->instp++] = b;
 	*(uint16_t*)(x->bytecode + x->instp) = v; // constant value
 	x->instp += 2;
 };
 
-static inline void closecode(struct kissfuck* x, enum bytecode b, int v) {
+// links jumps instructions to each other (on instruction below each other)
+static int finallize_jumppair(struct compstate* x, uint16_t f, uint16_t s) {
+	// next instructions after JPZ and JPNZ instructions
+	uint16_t start = f + sizeof(uint16_t) + 1;
+	uint16_t end   = s + sizeof(uint16_t) + 1;
+	// set jump distanations 
+	*(uint16_t*)(x->bytecode + f + 1) = end;
+	*(uint16_t*)(x->bytecode + s + 1) = start;
+	return ERR_OK;
+}
+
+// tries to finnalize jumppair (returns 1 on success)
+static int trytofinnalize(struct compstate* x) {
+	uint16_t* start = &x->jmptbl[x->jmptblpos][1];
+	uint16_t* end   = &x->jmptbl[x->jmptblpos][0];
+
+	if (*start && *end) {
+		// table can be finnalized!
+		assert(finallize_jumppair(x, *start, *end) == ERR_OK);
+		*start = 0;
+		*end   = 0;
+		return 1;
+	}
+	return 0;
+}
+
+static void addjumpstart(struct compstate* x) {
+	// if jump table is busy
+	if (x->jmptbl[x->jmptblpos][0]) x->jmptblpos++;
+	// add start of the loop to the jumptable
+	x->jmptbl[x->jmptblpos][0] = x->instp;
+
+	// instruction will be rewrited later
+	pushbc2(x, BC_JPZ, 0);
+
+	if (trytofinnalize(x)) {
+		// move forward if next jumpfield is not empity
+		uint16_t npos = x->jmptblpos + 1;
+		if (x->jmptbl[npos][0] || x->jmptbl[npos][1]) x->jmptblpos = npos;
+	}
+}
+
+static void addjumpend(struct compstate* x) {
+	// if jump table is busy
+	if (x->jmptbl[x->jmptblpos][1]) x->jmptblpos--;
+	// add start of the loop to the jumptable
+	x->jmptbl[x->jmptblpos][1] = x->instp;
+
+	// instruction data will be rewrited later
+	pushbc2(x, BC_JPNZ, 0);
+
+	if (trytofinnalize(x)) {
+		// move backward if next jumpfield is not empity
+		uint16_t npos = x->jmptblpos - 1;
+		if (x->jmptbl[npos][0] || x->jmptbl[npos][1]) x->jmptblpos = npos;
+	}
+}
+
+// finnaly adds instruction to bytecode
+static void newcode(struct compstate* x, enum bytecode n) {
+	enum bytecode b = x->currcode;
+	int v = x->codedata;
+
 	if (b == BC_ADD || b == BC_SET) {
 		if (v == 0) {return;}
 		else if (v > 0) pushbc1(x, b, v);
@@ -83,156 +140,105 @@ static inline void closecode(struct kissfuck* x, enum bytecode b, int v) {
 			pushbc2(x, b, (uint16_t)(UINT16_MAX - v + 1));
 		}
 	} else if (b == BC_IN || b == BC_OUT) {
-		if (v <= 0) {
-			fprintf(stderr, "Value is below zero or equal; for normal operands :/\n");
-			exit(-1);
-		}
+		assert(v > 0 && "Value is belowequal zero");
 		pushbc1(x, b, v);
 	} else if (b == BC_HALT) {
 		pushbc1(x, b, 0);
 	}
+
+	x->currcode = n;
+	x->codedata = 0;
 }
 
-int loadcode(struct kissfuck* x, const char* filename) {
-	if (x == ERR_ERR) return ERR_ERR;
+/*
+ * Compilation functions :p
+ */
+int loadcode(struct kissfuck* kf, const char* filename) {
+	if (kf == ERR_ERR) return ERR_ERR;
+	int status = ERR_OK;
+	char ch;
+
+	struct compstate  state = {0};
+	state.currcode = 128;
+	struct compstate* x = &state;
+	x->bytecode = kf->bytecode;
 
 	// init
-	x->line = 0;
-	x->instp = 0;
-	x->cellp = 0;
+	stopcode(kf);
 
 	FILE *f = fopen(filename, "r");
 	if (!f) {
-		compiler_message(x, "Can't open file!");
+		fprintf(stderr, "[compiler] : can't open file %s!\n", filename);
 		return ERR_ERR;
 	}
 
-	int status   = ERR_OK;
-	enum bytecode oldcode = 90;
-	int  codedata         = 0;
-	uint16_t jmptbl[65536][2] = {0}; // holy shit
-	uint16_t jmptblpos        = 0;
-	
-	char ch = getc(f);
-	#define NEXT_CHAR() ch = getc(f);
-	while (checkchar(f, ch)) {
+	while ((ch = getc(f)) && !feof(f)) {
 
 		if (CHAR_COMM(ch)) { // comment
 			while (getc(f) != '\n') {};
-			x->line++; NEXT_CHAR();
+			x->line++; 
 		} else if (VALID_TOKEN(ch)) {
-			int val= 0;
+			int val = 0;
 			switch (ch) {
 			// + and -
 			case TOKEN_INC :
-				val = 2;
-				// falltrough
+				val = 2; 
+				_fallthrough()
 			case TOKEN_DEC :
 				val--;
-				if (oldcode != BC_ADD && oldcode != BC_SET) {
-					closecode(x, oldcode, codedata);
-					oldcode = BC_ADD;
-					codedata = 0;
-				}
-				codedata += val;
+				if (x->currcode != BC_ADD && x->currcode != BC_SET) newcode(x, BC_ADD);
+				x->codedata += val;
 			break;
 			// ,
 			case TOKEN_IN :
-				if (oldcode != BC_IN) {
-					closecode(x, oldcode, codedata);
-					oldcode = BC_IN;
-					codedata = 0;
-				}
-				codedata += 1;
+				if (x->currcode != BC_IN)  newcode(x, BC_IN);
+				x->codedata += 1;
 			break;
 			// .
 			case TOKEN_OUT :
-				if (oldcode != BC_OUT) {
-					closecode(x, oldcode, codedata);
-					oldcode = BC_OUT;
-					codedata = 0;
-				}
-				codedata += 1;
+				if (x->currcode != BC_OUT) newcode(x, BC_OUT);
+				x->codedata += 1;
 			break;
-			/*
-			 * TODO: GOOCLE TRANSLATE HELP ME :(
-			 * NEXT and PREV operations are взаимоисключающие like addition and substraction
-			 */
+			// NEXT and PREV operations are mutually exclusive
+			// operations like addition and substraction
 			// > and <
 			case TOKEN_NEXT :
 				val = 2;
+				_fallthrough()
 			case TOKEN_PREV :
 				val--;
-				if (oldcode != BC_NEXT) {
-					closecode(x, oldcode, codedata);
-					oldcode = BC_NEXT;
-					codedata = 0;
-				}
-				codedata += val;
+				if (x->currcode != BC_NEXT) newcode(x, BC_NEXT);
+				x->codedata += val;
 			break;
-			/*
-			 * Loops a bit harder to make ;p
-			 * We need to use jumptable for this
-			 */
+			// Loops a bit harder to make ;p
+			// We need to use jumptable for this
 			// [
 			case TOKEN_LOOP :
-				// close other bytecodes
-				closecode(x, oldcode, codedata);
-				oldcode = BC_JPZ;
-				codedata = 0;
-				// jump calculations
-				if (jmptbl[jmptblpos][0]) jmptblpos++;
-				jmptbl[jmptblpos][0] = x->instp;  // add start of the loop to the jumptable
-				// instruction body will be rewrited later...
-				pushbc2(x, BC_JPZ, 0);
-
-				if (jmptbl[jmptblpos][1]) {	// finalized pair
-					if (finallize_jumppair(x, jmptbl[jmptblpos][0], jmptbl[jmptblpos][1]) != ERR_OK) {
-						compiler_message(x, "Can't finnalize jump pair! Internal error!");
-						status = ERR_ERR; goto end_it;
-					}
-					jmptbl[jmptblpos][0] = 0; jmptbl[jmptblpos][1] = 0; // cleanup :p
-					uint16_t npos = jmptblpos + 1;
-					if (jmptbl[npos][0] || jmptbl[npos][1]) jmptblpos = npos; // important
-				}
+				newcode(x, BC_JPZ); // close other bytecodes
+				addjumpstart(x); // save code position to the jump table
 				break;
 			// ]
 			case TOKEN_POOL :
-				// close other bytecodes
-				closecode(x, oldcode, codedata);
-				oldcode = BC_JPNZ;
-				codedata = 0;
-				// jump calculations
-				if (jmptbl[jmptblpos][1]) jmptblpos--;
-				jmptbl[jmptblpos][1] = x->instp;  // add end of the loop to the jumptable
+				newcode(x, BC_JPNZ); // close other bytecodes
+				addjumpend(x); // save code position to the jumptable
 				// instruction body will be rewrited later...
 				pushbc2(x, BC_JPNZ, 0);
 
-				if (jmptbl[jmptblpos][0]) {	// finalized pair
-					if (finallize_jumppair(x, jmptbl[jmptblpos][0], jmptbl[jmptblpos][1]) != ERR_OK) {
-						compiler_message(x, "Can't finnalize jump pair! Internal error!");
-						status = ERR_ERR; goto end_it;
-					}
-					jmptbl[jmptblpos][0] = 0; jmptbl[jmptblpos][1] = 0; // cleanup :p
-					uint16_t npos = jmptblpos - 1;
-					if (jmptbl[npos][0] || jmptbl[npos][1]) jmptblpos = npos; // important
-				}
 			break;
 			default: 
 				compiler_message(x, "impossible!");
 				status = ERR_ERR;
 				goto end_it;
 			break;
-		};NEXT_CHAR();} else if (ch == '\n' || ch == '\r') {
-				NEXT_CHAR();
+		}} else if (ch == '\n' || ch == '\r') {
 				x->line++;
-		} else NEXT_CHAR();
+		};
 	};
-	closecode(x, oldcode, codedata);
+	newcode(x, 128);
 
-	if (jmptblpos != 0) {
+	if (x->jmptblpos != 0) {
 		compiler_message(x, "Code is not balanced!");
-		fprintf(stderr, "[compiler] : unused branches count %i!\n", jmptblpos);
+		fprintf(stderr, "[compiler] : unused branches count %i!\n", x->jmptblpos);
 		status = ERR_ERR;
 		goto end_it;
 	}	

@@ -12,13 +12,15 @@
  * text :p
  */
 
-#define STR_VERSION "kissfuck v.1.0\n"
+#include <stddef.h>
+
+#define STR_VERSION "kissfuck v.1.1\n"
 
 #define STR_ABOUT \
 	"kissfuck - KISS brainfuck interpreter.\n"\
 	"Coptyright (C) UtoECat 2023. All rights reserved!\n"\
 	"GNU GPL License. NO ANY WARRIANTY!\n"\
-	"Github : https://"
+	"Github : https://github.com/UtoECat/kissfuck\n"
 
 #define STR_USAGE "\tUSAGE :\n"\
 	" $ %s [-h to help]\n $ %s [-v to version]\n"\
@@ -56,9 +58,6 @@ int debug = 0;
 
 static int parse_argv(int argc, char** argv) {
 	argv0 = argv[0];
-
-	// nothing to parse!
-	if (argc < 2) return ERR_OK; 
 
 	if (argc > 3) {
 		print_usage(2);
@@ -100,7 +99,6 @@ int main(int argc, char** argv) {
 	if (execcode(K) != ERR_OK) {
 		fprintf(stderr, "Show bytecode Dump? (y/n) : ");
 		if (debug || getchar() == 'y') dumpcode(K);
-	}
-	if (debug) dumpcode(K);
+	} else if (debug) dumpcode(K);
 	return 0;
 }
