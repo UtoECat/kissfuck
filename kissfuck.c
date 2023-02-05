@@ -14,7 +14,7 @@
 
 #include <stddef.h>
 
-#define STR_VERSION "kissfuck v.1.1\n"
+#define STR_VERSION "kissfuck v.1.2\n"
 
 #define STR_ABOUT \
 	"kissfuck - KISS brainfuck interpreter.\n"\
