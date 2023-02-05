@@ -62,6 +62,27 @@ static inline void pushbc2(struct compstate* x, enum bytecode b, uint16_t v) {
 	x->instp += 2;
 };
 
+// does some loop optimisations :p
+static void loopoptimisation(struct compstate* x, uint16_t fst, uint16_t sec) {
+	uint16_t ipos = fst + sizeof(uint16_t) + 1;
+	if (sec == ipos) { // this is an infinite loop :O
+		x->instp -= 3; // remove BC_JPNZ
+		*(uint16_t*)(x->bytecode + fst + 1) = sec + 1;
+		x->bytecode[x->instp++] = BC_HALT;
+		assert(x->instp == sec + 1); // for some reason...
+	}
+	if (sec == (ipos + 2) && x->bytecode[ipos] == BC_ADD) {
+		// [-]and [+] optimisation
+		x->instp -= 3 + 2 + 3; // remove loop fully
+		pushbc1(x, BC_SET, 0); // heheboi
+	} else if (sec == (ipos + 3) && x->bytecode[ipos] == BC_NEXT) {
+		// [>] and [<] optimisation :D
+		uint16_t v = *(uint16_t*)(x->bytecode + ipos + 1); // read arg
+		x->instp -= 3 + 3 + 3; // remove loop fully
+		pushbc2(x, BC_NUNZ, v); // next until not zero :p
+	}
+}
+
 // links jumps instructions to each other (on instruction below each other)
 static int finallize_jumppair(struct compstate* x, uint16_t f, uint16_t s) {
 	// next instructions after JPZ and JPNZ instructions
@@ -70,17 +91,20 @@ static int finallize_jumppair(struct compstate* x, uint16_t f, uint16_t s) {
 	// set jump distanations 
 	*(uint16_t*)(x->bytecode + f + 1) = end;
 	*(uint16_t*)(x->bytecode + s + 1) = start;
+
+	// do some optimisations
+	loopoptimisation(x, f, s);
 	return ERR_OK;
 }
 
 // tries to finnalize jumppair (returns 1 on success)
 static int trytofinnalize(struct compstate* x) {
-	uint16_t* start = &x->jmptbl[x->jmptblpos][1];
-	uint16_t* end   = &x->jmptbl[x->jmptblpos][0];
+	uint16_t* start = &x->jmptbl[x->jmptblpos][0];
+	uint16_t* end   = &x->jmptbl[x->jmptblpos][1];
 
 	if (*start && *end) {
 		// table can be finnalized!
-		assert(finallize_jumppair(x, *start, *end) == ERR_OK);
+		finallize_jumppair(x, *start, *end);
 		*start = 0;
 		*end   = 0;
 		return 1;
@@ -221,9 +245,6 @@ int loadcode(struct kissfuck* kf, const char* filename) {
 			case TOKEN_POOL :
 				newcode(x, BC_JPNZ); // close other bytecodes
 				addjumpend(x); // save code position to the jumptable
-				// instruction body will be rewrited later...
-				pushbc2(x, BC_JPNZ, 0);
-
 			break;
 			default: 
 				compiler_message(x, "impossible!");

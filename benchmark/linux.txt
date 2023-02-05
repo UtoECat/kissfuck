@@ -1,0 +1,42 @@
+This is benchmake for ./kissfuck virtual machine! :p
+ You can pass any other vm as first argument! 
+    perf utility required to be installed!    
+----------------------------------------------
+-------------------------------------------
+running for a file ./tests/addition.bfk
+                                           
+EEEEEEEEEEEEEEEEEEEEEEEDDDDDDDDDDDDDDDDDDDDDDDCCCCCCCCCCCCCCCCCCCCCCCAAAAAAAAAAAAAAAAAAAAAAAEEEEEEEEEEEEEEEEEEEEEEE
+
+elapsed=0:00.00 cpu=50% returns=0
+-------------------------------------------
+running for a file ./tests/beaver.txt
+                                           
+OK
+
+
+elapsed=0:00.11 cpu=99% returns=0
+-------------------------------------------
+running for a file ./tests/bench.txt
+                                           
+OK
+
+elapsed=0:00.01 cpu=83% returns=0
+-------------------------------------------
+running for a file ./tests/counter.txt
+                                           
+OK
+
+
+elapsed=0:16.28 cpu=95% returns=0
+-------------------------------------------
+running for a file ./tests/loop.bfk
+                                           
+TSRQPONMLKJIHGFEDCBA@?>=<;:9876543210/.-,+
+
+elapsed=0:00.00 cpu=100% returns=0
+-------------------------------------------
+running for a file ./tests/NUNZ.bfk
+                                           
+222222OK
+
+elapsed=0:00.00 cpu=0% returns=0

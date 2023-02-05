@@ -1,0 +1,41 @@
+This is benchmake for wine ./kissfuck.exe virtual machine! :p
+ You can pass any other vm as first argument! 
+    perf utility required to be installed!    
+----------------------------------------------
+-------------------------------------------
+running for a file ./tests/addition.bfk
+                                           
+EEEEEEEEEEEEEEEEEEEEEEEDDDDDDDDDDDDDDDDDDDDDDDCCCCCCCCCCCCCCCCCCCCCCCAAAAAAAAAAAAAAAAAAAAAAAEEEEEEEEEEEEEEEEEEEEEEE
+
+elapsed=0:12.46 cpu=1% returns=0
+-------------------------------------------
+running for a file ./tests/beaver.txt
+                                           
+OK
+
+elapsed=0:00.30 cpu=41% returns=0
+-------------------------------------------
+running for a file ./tests/bench.txt
+                                           
+OK
+
+elapsed=0:00.18 cpu=64% returns=0
+-------------------------------------------
+running for a file ./tests/counter.txt
+                                           
+OK
+
+
+elapsed=0:13.95 cpu=0% returns=0
+-------------------------------------------
+running for a file ./tests/loop.bfk
+                                           
+TSRQPONMLKJIHGFEDCBA@?>=<;:9876543210/.-,+
+
+elapsed=0:00.17 cpu=68% returns=0
+-------------------------------------------
+running for a file ./tests/NUNZ.bfk
+                                           
+222222OK
+
+elapsed=0:00.19 cpu=62% returns=0

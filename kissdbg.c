@@ -14,7 +14,8 @@
 #include <stddef.h>
 
 static const char* bcname[] = {
-	"HALT", "SET ", "ADD ", "IN  ", "OUT ", "NEXT", "JPZ ", "JPNZ"
+	"HALT", "SET ", "ADD ", "IN  ", "OUT ",
+ 	"NEXT", "JPZ ", "JPNZ", "COPY", "NUNZ"
 };
 
 /*
@@ -44,7 +45,7 @@ void printbytecode (struct kissfuck* x, int i, int arg) {
 	if (l >= 0) fprintf(stderr, "(0x%05X) L%03i\t: ", i, l);
 	else fprintf(stderr, "(0x%05X)   \t: ", i);
 	enum bytecode bc = x->bytecode[i];
-	if (bc <= 7) fprintf(stderr, bcname[bc]);
+	if (bc <= 9) fprintf(stderr, bcname[bc]);
 	else {
 		int v = bc;
 		fprintf(stderr, "?%03i", v);
@@ -76,7 +77,7 @@ void printbytecode (struct kissfuck* x, int i, int arg) {
 
 static void printunkn(struct kissfuck* x, int i) {
 	int l = find_label(i);
-	if (l >= 0) fprintf(stderr, "L%03i\t: ", l);
+	if (l >= 9) fprintf(stderr, "L%03i\t: ", l);
 	else fprintf(stderr, "   \t: ");
 	int bc = x->bytecode[i];
 	fprintf(stderr, "?%03i", bc);
@@ -97,7 +98,7 @@ int dumpcode(struct kissfuck* x) {
 		if (ch == BC_JPZ || ch == BC_JPNZ) {
 			printbytecode(x, i, 3);
 			i += 3;
-		} else if (ch == BC_NEXT) {
+		} else if (ch == BC_NEXT || ch == BC_NUNZ) {
 			printbytecode(x, i, 2);
 			i += 3;
 		}	else if (ch == BC_HALT) {

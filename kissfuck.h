@@ -55,11 +55,12 @@
 #define VALID_CHAR(A) (VALID_TOKEN(A) || CHAR_COMM(A))
 
 /*
- * BYTECODE section
+ * BYTECODE
  */
 
 enum bytecode {
 	// bc   = id // (args in bytes count) desc
+	// LOW LEVEL CONSTANT OPERATIONS
 	BC_HALT = 0, // (0) stops execution
 	BC_SET  = 1, // (1) set current cell value == '[-]'
 	BC_ADD  = 2, // (1) adds constant number
@@ -68,6 +69,10 @@ enum bytecode {
 	BC_NEXT = 5, // (2) goes to next N cell
 	BC_JPZ  = 6, // (2) jump if zero forward
 	BC_JPNZ = 7, // (2) jump if not zero backward
+	
+	// HIGH LEVEL OPERATIONS
+	BC_COPY = 8, // (1) copies value from curr cell to next N cell
+	BC_NUNZ = 9, // (2) jump next N cells until not zero == '[>]'
 };
 
 #define BC_OPTIMIZABLE(A) (A < BC_JPZ)

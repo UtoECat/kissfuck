@@ -43,7 +43,7 @@ int execcode (struct kissfuck* const x) {
 
 	while (works) {
 		if (unlikely(has_signal)) {
-			fprintf(stderr, "[vm] : INTERRUPTED!\n");
+			fprintf(stderr, "\n[vm] : INTERRUPTED!\n");
 			break;
 		};
 		uint8_t C = reads();
@@ -81,6 +81,10 @@ int execcode (struct kissfuck* const x) {
 		case BC_JPNZ:
 			if (cell())  IP = readl();
 			else IP += 2; // skip readed value only if we skips jump
+		break;
+		case BC_NUNZ:
+			while (cell()) SP += readl();
+			IP += 2;
 		break;
 		default :
 			// you will never get here!
