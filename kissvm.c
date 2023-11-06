@@ -30,18 +30,18 @@ static void handler(int) {
 }
 
 #define cell()  (x->array[SP])
-#define reads() ((uint8_t)x->bytecode[IP])
-#define readl() *(uint16_t*)(x->bytecode + (IP))
+#define reads() ((uint8_t)BC[IP])
+#define readl() *(uint16_t*)(BC + (IP))
 
-int execcode (struct kissfuck* const x) {
+int execcode (struct kissfuck* restrict const x) {
 	signal(SIGINT, handler);
 
-	int     works = 1;
 	register uint16_t IP  = x->instp;
 	register uint16_t SP  = x->cellp;
+	register const uint8_t *BC = x->bytecode;
 	has_signal   = 0;
 
-	while (works) {
+	while (BC) {
 		if (unlikely(has_signal)) {
 			fprintf(stderr, "\n[vm] : INTERRUPTED!\n");
 			break;
@@ -50,7 +50,7 @@ int execcode (struct kissfuck* const x) {
 		IP++;
 		switch (C) {
 		case BC_HALT:
-			fflush(stdout); works = 0; IP--;
+			fflush(stdout); BC = NULL; IP--;
 		break;
 		case BC_SET :
 			cell() = reads();
@@ -62,12 +62,14 @@ int execcode (struct kissfuck* const x) {
 		break;
 		case BC_IN  :
 			// ignore other characters
-			for (int i = 0; i < (reads() - 1); i++) getchar();
+			uint8_t m = reads();
+			for (int i = 0; i < (m - 1); i++) getchar();
 			cell() = getchar();
 			IP++;
 		break;
 		case BC_OUT :
-			for (int i = 0; i < reads(); i++) putchar(cell());
+			m = reads();
+			for (int i = 0; i < m; i++) putchar(cell());
 			IP++;
 		break;
 		case BC_NEXT:
@@ -75,20 +77,24 @@ int execcode (struct kissfuck* const x) {
 			IP += 2;
 		break;
 		case BC_JPZ :
-			if (!cell()) IP = readl();
+			if (!cell()) IP += readl();
 			else IP += 2; // skip readed value only if we skips jump
 		break;
 		case BC_JPNZ:
-			if (cell())  IP = readl();
+			if (cell())  IP += readl();
 			else IP += 2; // skip readed value only if we skips jump
 		break;
-		case BC_NUNZ:
-			while (cell()) SP += readl();
+		case BC_NUNZ: {
+			uint16_t cnt = readl();
+			while (cell()) SP += cnt;
 			IP += 2;
+		}
 		break;
 		default :
 			// you will never get here!
 			unreachable();
+			//fprintf(stderr, "BAD INSTRUCTION! pos = 0x%05X\n", IP);
+			//return ERR_ERR;
 		break;
 		};
 	};

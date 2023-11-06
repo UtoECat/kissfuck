@@ -60,8 +60,8 @@ void printbytecode (struct kissfuck* x, int i, int arg) {
 		int val = *(uint16_t*)(x->bytecode + i + 1);
 		fprintf(stderr, " %05i | ", val);
 	} else if (arg == 3) { // JPZ and JPNZ
-		get_label(i + 3); // save next instruction as  
-		int val = *(uint16_t*)(x->bytecode + i + 1);
+		get_label(i + 3); // save next instruction position
+		int val = (uint16_t)i + *(uint16_t*)(x->bytecode + i + 1);
 		val = get_label(val);
 		if (val < 0) fprintf(stderr, "  ???  | ");
 		else fprintf(stderr, " L%03i  | ", val);

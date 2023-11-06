@@ -93,7 +93,7 @@ struct kissfuck {
 };
 
 struct kissfuck* makectx();
-int  loadcode(struct kissfuck*, const char* filename);
+int  loadcode(struct kissfuck* restrict const, const char* filename);
 int  execcode(struct kissfuck*);
 void stopcode(struct kissfuck*);
 int  dumpcode(struct kissfuck*);

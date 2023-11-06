@@ -89,8 +89,8 @@ static int finallize_jumppair(struct compstate* x, uint16_t f, uint16_t s) {
 	uint16_t start = f + sizeof(uint16_t) + 1;
 	uint16_t end   = s + sizeof(uint16_t) + 1;
 	// set jump distanations 
-	*(uint16_t*)(x->bytecode + f + 1) = end;
-	*(uint16_t*)(x->bytecode + s + 1) = start;
+	*(uint16_t*)(x->bytecode + f + 1) = end - start + 2;
+	*(uint16_t*)(x->bytecode + s + 1) = start - end + 2;
 
 	// do some optimisations
 	loopoptimisation(x, f, s);
@@ -175,7 +175,7 @@ static void newcode(struct compstate* x, enum bytecode n) {
 }
 
 /*
- * Compilation functions :p
+ * Compilation function :p
  */
 int loadcode(struct kissfuck* kf, const char* filename) {
 	if (kf == ERR_ERR) return ERR_ERR;
