@@ -174,10 +174,49 @@ static void newcode(struct compstate* x, enum bytecode n) {
 	x->codedata = 0;
 }
 
+struct reader {
+	void* ctx;
+	int (*getc) (void*);
+	int (*iseof) (void*);
+};
+
 /*
- * Compilation function :p
+ * Compile string :p
  */
-int loadcode(struct kissfuck* kf, const char* filename) {
+static int sgetc(void* ctx) {
+	const char** ptr = (const char**)ctx;
+	char c = **ptr;
+	if (c) (*ptr)++;
+	return c;
+}
+
+static int seof(void* ctx) {
+	const char** ptr = (const char**)ctx;
+	return (**ptr) == '\0';
+}
+
+static const struct reader string_reader = {
+	NULL, sgetc, seof
+};
+
+static int ffgetc(void* ctx) {
+	FILE* ptr = (FILE*)ctx;
+	return getc(ptr);
+}
+
+static int ffeof(void* ctx) {
+	FILE* ptr = (FILE*)ctx;
+	return feof(ptr);
+}
+
+static const struct reader file_reader = {
+	NULL, ffgetc, ffeof
+};
+
+/*
+ * Generic compilation function :p
+ */
+static int compile(struct kissfuck* kf, struct reader rd) {
 	if (kf == ERR_ERR) return ERR_ERR;
 	int status = ERR_OK;
 	char ch;
@@ -190,16 +229,10 @@ int loadcode(struct kissfuck* kf, const char* filename) {
 	// init
 	stopcode(kf);
 
-	FILE *f = fopen(filename, "r");
-	if (!f) {
-		fprintf(stderr, "[compiler] : can't open file %s!\n", filename);
-		return ERR_ERR;
-	}
-
-	while ((ch = getc(f)) && !feof(f)) {
+	while ((ch = rd.getc(rd.ctx)) && !rd.iseof(rd.ctx)) {
 
 		if (CHAR_COMM(ch)) { // comment
-			while (getc(f) != '\n') {};
+			while (rd.getc(rd.ctx) != '\n' && !rd.iseof(rd.ctx)) {};
 			x->line++; 
 		} else if (VALID_TOKEN(ch)) {
 			int val = 0;
@@ -265,8 +298,30 @@ int loadcode(struct kissfuck* kf, const char* filename) {
 	}	
 
 	end_it :
-	fclose(f);
 	return status;
 }
 
+int loadcode(struct kissfuck* kf, const char* filename) {
+	if (!filename) return ERR_ERR;
+	FILE *f = fopen(filename, "r");
+	if (!f) {
+		fprintf(stderr, "[compiler] : can't open file %s!\n", filename);
+		return ERR_ERR;
+	}
 
+	struct reader rd = file_reader;
+	rd.ctx = (void*)f;
+
+	int stat = compile(kf, rd);
+	
+	fclose(f);
+	return stat;
+}
+
+int loadstring(struct kissfuck* kf, const char* string) {
+	struct reader rd = string_reader;
+	rd.ctx = (void*)(&string);
+
+	int stat = compile(kf, rd);
+	return stat;
+}

@@ -24,7 +24,8 @@
 
 #define STR_USAGE "\tUSAGE :\n"\
 	" $ %s [-h to help]\n $ %s [-v to version]\n"\
-	" $ %s [filename]\n $ %s [-d to debug] [filename]\n"
+	" $ %s [filename]\n $ %s [-d to debug] [filename]\n"\
+	" $ %s [FLAGS...] -e [Brainfuck Code...]"
 
 #define STR_HELP \
 	"\tLANGUAGE :\n"\
@@ -39,13 +40,14 @@
 	">\tChanges cell to next\n"
 
 static const char* default_filename = "./test.bfk";
+static int do_eval = 0;
 static const char* argv0 = "NULL";
 
 static inline void print_usage(int err) {
 	if (err == 2) fprintf(stderr, "Bad Usage! ");
 	if (err == 3) fprintf(stderr, "Bad Flag! ");
 	if (err == 4) fprintf(stderr, " -- flags are not allowed! ");
-	fprintf(stderr, STR_USAGE, argv0, argv0, argv0, argv0);
+	fprintf(stderr, STR_USAGE, argv0, argv0, argv0, argv0, argv0);
 }
 
 static inline void print_help() {
@@ -59,7 +61,7 @@ int debug = 0;
 static int parse_argv(int argc, char** argv) {
 	argv0 = argv[0];
 
-	if (argc > 3) {
+	if (argc > 4) {
 		print_usage(2);
 		return ERR_ERR;
 	}
@@ -80,6 +82,12 @@ static int parse_argv(int argc, char** argv) {
 			goto repeatit;
 		break;
 		case 'v' : fprintf(stderr, STR_VERSION); return ERR_ERR;
+		case 'e' : do_eval = 1;
+			if (!argv[i+1]) return ERR_ERR;
+			default_filename = argv[i+1];
+			do_eval = 1;
+			break;
+		break;
 		default  : print_usage(3);               return ERR_ERR;
 	}
 	return ERR_OK;
@@ -90,7 +98,7 @@ int main(int argc, char** argv) {
 	if (parse_argv(argc, argv) != ERR_OK) return -1;
 	struct kissfuck* K = makectx();
 	if (K == ERR_ERR) return -2;
-	if (loadcode(K, default_filename) != ERR_OK) {
+	if ((do_eval ? loadstring(K, default_filename) : loadcode(K, default_filename)) != ERR_OK) {
 		fprintf(stderr, "Show bytecode Dump? (y/n) : ");
 		if (debug || getchar() == 'y') dumpcode(K);
 		return -3;
